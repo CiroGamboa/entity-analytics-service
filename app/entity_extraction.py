@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
 
 user_key = os.environ.get('TRENDSCANNER_ENTITY_EXTRACTION_KEY')
-#nlp = spacy.load('en_core_web_lg')
 
 try:
 	nlp = spacy.load("en_core_web_sm")
@@ -94,7 +93,7 @@ def get_entities(extraction_string,
 
     api_url = 'http://www.wikifier.org/annotate-article?'
 
-    payload = {'userKey': user_key, 'text': extraction_string, 'lang': 'auto',
+    payload = {'userKey': user_key, 'text': extraction_string, 'lang': 'en',
                'minLinkFrequency': min_link_freq,
                'applyPageRankSqThreshold': apply_page_rank_sq_threshold,
                'includeCosines':'false',
@@ -126,10 +125,10 @@ class EntityExtractor:
     def get_annotations_wiki(self,
                         extraction_string,
                         page_rank_sq_threshold       = "-1",       # (float) a lower x results in a higher threshold and less annotations default(-1)
-                        apply_page_rank_sq_threshold = "false",    # (bool) to actually discard the annotations whose pagerank is < minPageRank (defaultis False)
+                        apply_page_rank_sq_threshold = "true",    # (bool) to actually discard the annotations whose pagerank is < minPageRank (defaultis False)
                         min_link_freq                = "1",        # (int) default 1
                         max_mention_entropy          = "-1",       # (float) cause all highly ambiguous mentions to be ignored float (default -1)
-                        max_targets_per_mention      = "20",       # (int) to use only the most frequent x candidate annotations for each mention (default x=20)
+                        max_targets_per_mention      = "-1",       # (int) to use only the most frequent x candidate annotations for each mention (default x=20)
                         wiki_data_classes            = "true",
                         wiki_data_class_ids          = "false"):
 
@@ -185,11 +184,20 @@ class EntityExtractor:
             List() of lists [entity.text,entity.label_]
         """
 
+        print(doc.ents)
+        # Aquí se podrían sacar solo entidades únicas (Ford, Ford)
+
         res = []
+        entity_types = []
+        allowed_types = ["PERSON", "ORG", "GPE", "DATE", "PRODUCT", "CONCEPT", "SUBSTANCE", "EVENT", "ACTIVITY"]
         if doc.ents:
             for ent in doc.ents:
-                if ent.label_ == "PERSON" or ent.label_=="ORG" or ent.label_== "GPE":
+                if ent.label_ not in entity_types:
+                    entity_types.append(ent.label_)
+                if ent.label_ in allowed_types:
                     res.append([ent.text,ent.label_])
+        
+        print(entity_types)
         return res
 
     def get_annotations(self,doc):
@@ -213,7 +221,9 @@ class EntityExtractor:
         txt = nlp(doc)
         entities_list = self.get_annotations_spacy(txt)
         temp_txt = " ".join([ent[0] for ent in entities_list])
-        _,wiki_res = self.get_annotations_wiki(extraction_string=temp_txt)
+        #_,wiki_res = self.get_annotations_wiki(extraction_string=temp_txt)
+        _,wiki_res = self.get_annotations_wiki(extraction_string=doc)
+        print(wiki_res)
         for ent in entities_list:
             if ent[0] in wiki_res:
                 ent.append(wiki_res[ent[0]])
